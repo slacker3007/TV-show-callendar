@@ -38,18 +38,22 @@
                 <div class="divider"></div>
                 
                 <div class="filter-group">
-                    <button class="filter-btn active" data-filter="all">All</button>
-                    <button class="filter-btn" data-filter="popular">Popular</button>
+                    <button class="filter-btn active" data-filter="all">Latest</button>
+                    <button class="filter-btn" data-filter="popular">Trending</button>
+                    <button class="filter-btn" data-filter="rated">Top Rated</button>
+                    <button class="filter-btn" data-filter="hidden">Hidden</button>
+                </div>
+                
+                <div id="hidden-controls" class="hidden-controls" style="display: none;">
+                    <button id="export-blacklist" class="btn-icon" title="Export Hidden List"><i class="ri-download-2-line"></i></button>
+                    <button id="import-blacklist" class="btn-icon" title="Import Hidden List"><i class="ri-upload-2-line"></i></button>
+                    <input type="file" id="import-file" style="display: none;" accept=".json">
                 </div>
                 
                 <div class="divider"></div>
-                
-                <div class="platform-filters">
-                    <button class="plat-btn" data-plat="Netflix" title="Netflix"><i class="ri-netflix-fill"></i></button>
-                    <button class="plat-btn" data-plat="HBO" title="HBO"><i class="ri-tv-fill"></i></button>
-                    <button class="plat-btn" data-plat="Disney+" title="Disney+"><i class="ri-star-fill"></i></button>
-                    <button class="plat-btn" data-plat="Hulu" title="Hulu"><i class="ri-h-1"></i></button>
-                    <button class="plat-btn" data-plat="Prime Video" title="Amazon Prime"><i class="ri-amazon-fill"></i></button>
+                <div class="search-box">
+                    <i class="ri-search-line"></i>
+                    <input type="text" id="show-search" placeholder="Search 2026 hits...">
                 </div>
             </div>
         </nav>
