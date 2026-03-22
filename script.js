@@ -278,7 +278,11 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
             
             let eps = [...r1, ...r2].filter(e => {
-                if (!e || !e.show) return false;
+                if (!e) return false;
+                if (!e.show && e._embedded && e._embedded.show) {
+                    e.show = e._embedded.show;
+                }
+                if (!e.show) return false;
                 
                 const show = e.show;
                 const genres = show.genres || [];
