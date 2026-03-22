@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // State
     let currentStartDate = new Date('2026-03-22');
     let activeFilter = 'all';
+    let activePlatform = null;
     let activeView = 'weekly';
     const POPULAR_THRESHOLD = 60;
     
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevBtn = document.getElementById('prev-week');
     const nextBtn = document.getElementById('next-week');
     const filterBtns = document.querySelectorAll('.filter-btn');
+    const platBtns = document.querySelectorAll('.plat-btn');
     const viewBtns = document.querySelectorAll('.view-btn');
     const clearBlacklistBtn = document.getElementById('clear-blacklist');
 
@@ -45,6 +47,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 filterBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 activeFilter = btn.dataset.filter;
+                // If we select a generic filter, we might want to keep the platform or clear it. 
+                // Let's keep it for now.
+                renderCalendar();
+            };
+        });
+
+        platBtns.forEach(btn => {
+            btn.onclick = () => {
+                const plat = btn.dataset.plat;
+                if (activePlatform === plat) {
+                    activePlatform = null;
+                    btn.classList.remove('active');
+                } else {
+                    platBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    activePlatform = plat;
+                }
                 renderCalendar();
             };
         });
@@ -126,9 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const iso = date.toISOString().split('T')[0];
         const list = el.querySelector('.show-list');
         try {
+            // Fetch TV Network schedule for US and Web schedule for ALL countries (to catch global originals)
             const [r1, r2] = await Promise.all([
                 fetch(`https://api.tvmaze.com/schedule?country=US&date=${iso}`),
-                fetch(`https://api.tvmaze.com/schedule/web?country=US&date=${iso}`)
+                fetch(`https://api.tvmaze.com/schedule/web?date=${iso}`)
             ]);
             if (!r1.ok || !r2.ok) throw new Error();
             const d1 = await r1.json(), d2 = await r2.json();
@@ -153,6 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (isNewsOrSports) return false;
                 
+                // Filter out non-US/Global web channels if they don't have enough weight
+                const isGlobalOrUS = !show.webChannel?.country?.code || show.webChannel?.country?.code === 'US' || show.network?.country?.code === 'US';
+                if (!isGlobalOrUS && (show.weight || 0) < 30) return false;
+
                 return true;
             });
             const seen = new Set();
@@ -166,7 +190,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderEps(eps, container) {
         container.innerHTML = '';
         let filtered = eps;
-        if (activeFilter === 'popular') filtered = eps.filter(e => (e.show.weight || 0) >= POPULAR_THRESHOLD);
+        
+        if (activeFilter === 'popular') {
+            filtered = filtered.filter(e => (e.show.weight || 0) >= POPULAR_THRESHOLD);
+        }
+
+        if (activePlatform) {
+            filtered = filtered.filter(e => {
+                const nw = (e.show.network?.name || e.show.webChannel?.name || '').toLowerCase();
+                const plat = activePlatform.toLowerCase();
+                
+                if (plat === 'hbo') return nw.includes('hbo') || nw.includes('max');
+                if (plat === 'prime video') return nw.includes('prime') || nw.includes('amazon');
+                return nw.includes(plat);
+            });
+        }
 
         if (filtered.length === 0) { container.innerHTML = '<div class="no-episodes">-</div>'; return; }
 
@@ -178,10 +216,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const img = activeView === 'weekly' ? `<div class="image-container"><img src="${e.show.image?.medium || ''}" alt=""></div>` : '';
             
+            // Get Platform info for label
+            const platformName = e.show.webChannel?.name || e.show.network?.name || '';
+            const platformClass = getPlatformClass(platformName);
+            const platformLabel = platformName ? `<span class="platform-label ${platformClass}">${platformName}</span>` : '';
+
             card.innerHTML = `
                 ${img}
                 <button class="hide-btn" title="Hide forever"><i class="ri-close-line"></i></button>
                 <div class="card-content">
+                    ${platformLabel}
                     <h4>${e.show.name}</h4>
                     <p class="episode-info">S${e.season}E${e.number}</p>
                     <div class="time">${e.airtime || 'Stream'}</div>
@@ -198,6 +242,17 @@ document.addEventListener('DOMContentLoaded', () => {
             card.onclick = () => window.open(e.show.url, '_blank');
             container.appendChild(card);
         });
+    }
+
+    function getPlatformClass(name) {
+        if (!name) return '';
+        const n = name.toLowerCase();
+        if (n.includes('netflix')) return 'netflix';
+        if (n.includes('hbo') || n.includes('max')) return 'hbo';
+        if (n.includes('disney')) return 'disney';
+        if (n.includes('hulu')) return 'hulu';
+        if (n.includes('prime') || n.includes('amazon')) return 'prime';
+        return '';
     }
 
     function fmtDate(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }

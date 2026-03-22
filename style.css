@@ -145,6 +145,46 @@ nav {
     color: white;
 }
 
+.platform-filters {
+    display: flex;
+    gap: 0.15rem;
+}
+
+.plat-btn {
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.15rem;
+    transition: all var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plat-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.plat-btn.active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.plat-btn[data-plat="Netflix"].active { color: #e50914; box-shadow: inset 0 0 10px rgba(229, 9, 20, 0.2); }
+.plat-btn[data-plat="HBO"].active { color: #a970ff; box-shadow: inset 0 0 10px rgba(169, 112, 255, 0.2); }
+.plat-btn[data-plat="Disney+"].active { color: #0063e5; box-shadow: inset 0 0 10px rgba(0, 99, 229, 0.2); }
+.plat-btn[data-plat="Hulu"].active { color: #1ce783; box-shadow: inset 0 0 10px rgba(28, 231, 131, 0.2); }
+.plat-btn[data-plat="Prime Video"].active { color: #00a8e1; box-shadow: inset 0 0 10px rgba(0, 168, 225, 0.2); }
+
+.filter-group {
+    display: flex;
+    gap: 0.25rem;
+}
+
 /* Calendar Grid */
 .calendar-grid {
     display: grid;
@@ -339,6 +379,22 @@ nav {
     font-size: 0.75rem;
     color: var(--text-secondary);
 }
+
+.platform-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.15rem;
+    display: block;
+}
+
+.platform-label.netflix { color: #e50914; opacity: 0.8; }
+.platform-label.hbo { color: #a970ff; opacity: 0.8; }
+.platform-label.disney { color: #0063e5; opacity: 0.8; }
+.platform-label.hulu { color: #1ce783; opacity: 0.8; }
+.platform-label.prime { color: #00a8e1; opacity: 0.8; }
+
 
 .show-card .time {
     font-size: 0.7rem;
