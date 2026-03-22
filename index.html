@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TV Pulse | Premium Show Tracker</title>
+    <meta name="description" content="Discover upcoming popular TV shows and episode releases with our premium calendar tracker. Stay updated with your favorite series.">
+    
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Remix Icons (Modern alternative to FontAwesome) -->
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+    <div class="glow-bg"></div>
+    
+    <header>
+        <nav class="container">
+            <div class="logo">
+                <i class="ri-pulse-fill"></i>
+                <span>TV Pulse</span>
+            </div>
+            <div class="date-controls">
+                <button id="prev-week" class="btn-icon"><i class="ri-arrow-left-s-line"></i></button>
+                <h2 id="current-range">March 2026</h2>
+                <button id="next-week" class="btn-icon"><i class="ri-arrow-right-s-line"></i></button>
+            </div>
+            <div class="filters">
+                <div class="view-toggle">
+                    <button class="view-btn active" data-view="weekly">Weekly</button>
+                    <button class="view-btn" data-view="monthly">Monthly</button>
+                </div>
+                <div class="divider"></div>
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="popular">Popular</button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container">
+        <!-- Calendar Grid -->
+        <div id="calendar-grid" class="calendar-grid">
+            <!-- Days will be injected here by JS -->
+        </div>
+    </main>
+
+    <footer>
+        <div class="container footer-content">
+            <div class="footer-left">
+                <p>&copy; 2026 TV Pulse. <a href="https://www.tvmaze.com/api" target="_blank">TVMaze API</a></p>
+                <button id="clear-blacklist" class="btn-text">Clear Hidden Shows</button>
+            </div>
+            <div class="social-links">
+                <i class="ri-github-fill"></i>
+                <i class="ri-twitter-x-fill"></i>
+                <i class="ri-instagram-line"></i>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Overlay for Show Details -->
+    <div id="details-modal" class="modal">
+        <div class="modal-content glass">
+            <button class="close-modal"><i class="ri-close-line"></i></button>
+            <div id="modal-body">
+                <!-- Data will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
