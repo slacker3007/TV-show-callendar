@@ -303,7 +303,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const seen = new Set();
             eps = eps.filter(e => seen.has(e.id) ? false : seen.add(e.id));
-            eps.sort((a,b) => (a.airtime || '00:00') > (b.airtime || '00:00') ? 1 : -1);
+            
+            eps.sort((a, b) => {
+                const aIsPremiere = a.number === 1;
+                const bIsPremiere = b.number === 1;
+                
+                if (aIsPremiere && !bIsPremiere) return -1;
+                if (!aIsPremiere && bIsPremiere) return 1;
+                
+                return (a.airtime || '00:00') > (b.airtime || '00:00') ? 1 : -1;
+            });
             
             renderEps(eps, list);
         } catch (e) { 
