@@ -119,8 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const dayEl = createDayEl(date);
             calendarGrid.appendChild(dayEl);
             
-            // Throttling to respect TVMaze's 20 req / 10 sec limit
-            if (i > 0 && i % 8 === 0) await delay(400); 
+            // Safer throttling for TVMaze (20 req / 10 sec)
+            if (i > 0 && i % 4 === 0) await delay(1000); 
             fetchDay(date, dayEl);
         }
     }
@@ -164,19 +164,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Blacklist check
                 if (blacklistedShows.includes(showId)) return false;
                 
-                // Policy: Filter out News and Sports
-                const isNewsOrSports = 
-                    type === 'News' || 
-                    type === 'Sports' || 
-                    genres.includes('News') || 
-                    genres.includes('Sports');
+                // Policy: Filter out News and Sports, UNLESS a specific platform is active
+                // (Ensures shows like WWE RAW on Netflix or GMA on Hulu are visible)
+                if (!activePlatform) {
+                    const isNewsOrSports = 
+                        type === 'News' || 
+                        type === 'Sports' || 
+                        genres.includes('News') || 
+                        genres.includes('Sports');
+                    
+                    if (isNewsOrSports) return false;
+                }
                 
-                if (isNewsOrSports) return false;
-                
-                // Filter out non-US/Global web channels if they don't have enough weight
-                const isGlobalOrUS = !show.webChannel?.country?.code || show.webChannel?.country?.code === 'US' || show.network?.country?.code === 'US';
-                if (!isGlobalOrUS && (show.weight || 0) < 30) return false;
-
                 return true;
             });
             const seen = new Set();
@@ -191,17 +190,22 @@ document.addEventListener('DOMContentLoaded', () => {
         container.innerHTML = '';
         let filtered = eps;
         
-        if (activeFilter === 'popular') {
+        // If a platform is selected, we usually want to see ALL shows on that platform,
+        // so we only apply the "popular" filter if NO platform is selected, or we make it optional.
+        if (activeFilter === 'popular' && !activePlatform) {
             filtered = filtered.filter(e => (e.show.weight || 0) >= POPULAR_THRESHOLD);
         }
 
         if (activePlatform) {
             filtered = filtered.filter(e => {
-                const nw = (e.show.network?.name || e.show.webChannel?.name || '').toLowerCase();
+                const nwName = e.show.network?.name || '';
+                const wbName = e.show.webChannel?.name || '';
+                const nw = (nwName + ' ' + wbName).toLowerCase();
                 const plat = activePlatform.toLowerCase();
                 
                 if (plat === 'hbo') return nw.includes('hbo') || nw.includes('max');
                 if (plat === 'prime video') return nw.includes('prime') || nw.includes('amazon');
+                if (plat === 'disney+') return nw.includes('disney'); // More lenient matching
                 return nw.includes(plat);
             });
         }
