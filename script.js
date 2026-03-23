@@ -4,7 +4,9 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // State
-    let currentStartDate = new Date('2026-03-22');
+    let currentStartDate = new Date();
+    const dayOfWeek = currentStartDate.getDay();
+    currentStartDate.setDate(currentStartDate.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1)); // Always start on Monday
     let activeFilter = 'popular'; // default to popular hits as requested
     let activePlatform = null; // platforms removed from UI but keeping for code logic safety
     let activeView = 'weekly';
@@ -68,14 +70,127 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
+        let searchTimeout;
         searchInput.oninput = () => {
-            // Live search in currently rendered grid
-            const query = searchInput.value.toLowerCase();
+            clearTimeout(searchTimeout);
+            const query = searchInput.value.trim().toLowerCase();
             const cards = document.querySelectorAll('.show-card');
+            let hasVisible = false;
+
             cards.forEach(card => {
                 const name = card.querySelector('h4').textContent.toLowerCase();
-                card.style.display = name.includes(query) ? 'block' : 'none';
+                const networkEl = card.querySelector('.platform-label');
+                const network = networkEl ? networkEl.textContent.toLowerCase() : '';
+                
+                if (name.includes(query) || network.includes(query)) {
+                    card.style.display = 'block';
+                    hasVisible = true;
+                } else {
+                    card.style.display = 'none';
+                }
             });
+
+            const existingPrompt = document.getElementById('global-search-prompt');
+            if (existingPrompt) existingPrompt.remove();
+
+            if (!hasVisible && query.length > 2) {
+                // Debounce the API call prompt to avoid showing it immediately for partial words, wait 500ms
+                searchTimeout = setTimeout(() => {
+                    const prompt = document.createElement('div');
+                    prompt.id = 'global-search-prompt';
+                    prompt.className = 'global-search-prompt card-content';
+                    prompt.style.gridColumn = '1 / -1';
+                    prompt.style.textAlign = 'center';
+                    prompt.style.padding = '2rem';
+                    prompt.style.background = 'rgba(255,255,255,0.05)';
+                    prompt.style.borderRadius = '10px';
+                    prompt.style.marginTop = '1rem';
+                    
+                    prompt.innerHTML = `
+                        <p style="margin-bottom: 0.5rem; color: var(--text-secondary);">Cannot find "${query}" in current view.</p>
+                        <button id="search-global-btn" class="btn-icon" style="padding: 0.5rem 1rem; border-radius: 8px;">
+                            <i class="ri-search-line"></i> Find closest release date
+                        </button>
+                    `;
+                    
+                    // Insert at the top of the calendar grid
+                    if (calendarGrid.firstChild) {
+                        calendarGrid.insertBefore(prompt, calendarGrid.firstChild);
+                    } else {
+                        calendarGrid.appendChild(prompt);
+                    }
+
+                    document.getElementById('search-global-btn').onclick = async () => {
+                        prompt.innerHTML = '<div class="loading" style="padding: 1rem;">Searching TVMaze...</div>';
+                        try {
+                            const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(query)}`);
+                            if (!res.ok) throw new Error('API Error');
+                            const data = await res.json();
+                            
+                            if (data.length > 0) {
+                                const showId = data[0].show.id;
+                                const showName = data[0].show.name;
+                                
+                                const epsRes = await fetch(`https://api.tvmaze.com/shows/${showId}/episodes`);
+                                const eps = await epsRes.json();
+                                
+                                if (eps.length > 0) {
+                                    const now = new Date().getTime();
+                                    let closestEp = eps[0];
+                                    let minDiff = Infinity;
+
+                                    eps.forEach(ep => {
+                                        if (ep.airstamp) {
+                                            const epTime = new Date(ep.airstamp).getTime();
+                                            const diff = Math.abs(epTime - now);
+                                            if (diff < minDiff) {
+                                                minDiff = diff;
+                                                closestEp = ep;
+                                            }
+                                        }
+                                    });
+
+                                    if (closestEp && closestEp.airstamp) {
+                                        const epDate = new Date(closestEp.airstamp);
+                                        const fmt = epDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                                        
+                                        prompt.innerHTML = `
+                                            <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                                                <h4 style="color: var(--text-primary); margin-bottom: 0.25rem;">${showName}</h4>
+                                                <p style="color: var(--accent); font-weight: 600;">Closest episode: S${closestEp.season}E${closestEp.number}</p>
+                                                <p style="color: var(--text-secondary); font-size: 0.85rem;">Airs on ${fmt}</p>
+                                                <button id="jump-to-date-btn" class="btn-icon" style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 8px;" data-date="${closestEp.airstamp}">
+                                                    Jump to Date
+                                                </button>
+                                            </div>
+                                        `;
+                                        
+                                        document.getElementById('jump-to-date-btn').onclick = (e) => {
+                                            const targetDate = new Date(e.target.dataset.date);
+                                            currentStartDate = targetDate;
+                                            if (activeView === 'weekly') {
+                                                const targetDayOfWeek = currentStartDate.getDay();
+                                                currentStartDate.setDate(currentStartDate.getDate() - (targetDayOfWeek === 0 ? 6 : targetDayOfWeek - 1));
+                                            }
+                                            searchInput.value = ''; // clear search
+                                            renderCalendar();
+                                        };
+                                    } else {
+                                        prompt.innerHTML = `<p style="color: var(--text-secondary);">No valid episode dates found for ${showName}.</p>`;
+                                    }
+                                } else {
+                                    prompt.innerHTML = `<p style="color: var(--text-secondary);">No episodes found for ${showName}.</p>`;
+                                }
+                            } else {
+                                prompt.innerHTML = `<p style="color: var(--text-secondary);">Show not found on TVMaze.</p>`;
+                            }
+                        } catch (err) {
+                            console.error(err);
+                            prompt.innerHTML = `<p style="color: #ff4d4d;">Error searching for show.</p>`;
+                        }
+                    };
+                }, 500);
+            }
         };
 
         viewBtns.forEach(btn => {
@@ -369,7 +484,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (filtered.length === 0) { container.innerHTML = '<div class="no-episodes">-</div>'; return; }
 
+        const groupedEps = new Map();
         filtered.forEach(e => {
+            if (!groupedEps.has(e.show.id)) {
+                groupedEps.set(e.show.id, []);
+            }
+            groupedEps.get(e.show.id).push(e);
+        });
+
+        groupedEps.forEach(group => {
+            const e = group[0];
             const card = document.createElement('div');
             card.className = 'show-card';
             const isPop = (e.show.weight || 0) >= POPULAR_THRESHOLD;
@@ -387,6 +511,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const isRunning = e.show.status?.toLowerCase() === 'running';
             const statusBadge = isRunning ? '' : `<span class="status-badge">${e.show.status}</span>`;
 
+            let epText = `S${e.season}E${e.number}`;
+            if (group.length > 1) {
+                epText += ` <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.70rem; margin-left: 4px; vertical-align: middle;">+${group.length - 1} Eps</span>`;
+            }
+
             card.innerHTML = `
                 ${img}
                 <button class="hide-btn" title="Hide forever"><i class="ri-close-line"></i></button>
@@ -396,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${rating}
                     </div>
                     <h4>${e.show.name}</h4>
-                    <p class="episode-info">S${e.season}E${e.number} ${statusBadge}</p>
+                    <p class="episode-info">${epText} ${statusBadge}</p>
                     <div class="time">${e.airtime || 'Stream'}</div>
                 </div>
             `;
@@ -426,7 +555,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function fmtDate(d) { return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
     function isToday(d) { 
-        const today = new Date('2026-03-22');
+        const today = new Date();
         return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
     }
 });
