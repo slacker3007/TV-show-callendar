@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeFilter = 'popular'; // default to popular hits as requested
     let activePlatform = null; // platforms removed from UI but keeping for code logic safety
     let activeView = 'weekly';
+    let activeGenre = 'all';
     const POPULAR_THRESHOLD = 50; // Lowered to include more "2026 hits"
     
     let blacklistedShows = JSON.parse(localStorage.getItem('tvpulse_blacklist') || '[]');
@@ -21,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextBtn = document.getElementById('next-week');
     const filterBtns = document.querySelectorAll('.filter-btn');
     const viewBtns = document.querySelectorAll('.view-btn');
+    const genreTabs = document.querySelectorAll('.genre-tab');
     const searchInput = document.getElementById('show-search');
     const blacklistedView = document.getElementById('calendar-grid'); // Reusing calendar grid for now
     const hiddenControls = document.getElementById('hidden-controls');
@@ -208,6 +210,15 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
+        genreTabs.forEach(tab => {
+            tab.onclick = () => {
+                genreTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                activeGenre = tab.dataset.genre;
+                renderCalendar();
+            };
+        });
+
         clearBlacklistBtn.onclick = () => {
             if (confirm('Show all hidden shows again?')) {
                 blacklistedShows = [];
@@ -387,12 +398,13 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             // Fetch TV Network schedule for US and Web schedule for ALL countries
             // We use .then to swallow errors and return empty list on individual failures
-            const [r1, r2] = await Promise.all([
+            const [r1, r2, r3] = await Promise.all([
                 fetch(`https://api.tvmaze.com/schedule?country=US&date=${iso}`).then(r => r.ok ? r.json() : []),
-                fetch(`https://api.tvmaze.com/schedule/web?date=${iso}`).then(r => r.ok ? r.json() : [])
+                fetch(`https://api.tvmaze.com/schedule/web?date=${iso}`).then(r => r.ok ? r.json() : []),
+                fetch(`https://api.tvmaze.com/schedule?country=KR&date=${iso}`).then(r => r.ok ? r.json() : [])
             ]);
             
-            let eps = [...r1, ...r2].filter(e => {
+            let eps = [...r1, ...r2, ...r3].filter(e => {
                 if (!e) return false;
                 if (!e.show && e._embedded && e._embedded.show) {
                     e.show = e._embedded.show;
@@ -403,8 +415,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const genres = show.genres || [];
                 const type = show.type || '';
                 
-                // Content Filter: English Only
-                if (show.language && show.language !== 'English') return false;
+                // Content Filter: English and Korean Only
+                if (show.language && show.language !== 'English' && show.language !== 'Korean') return false;
                 
                 // Blacklist check
                 if (blacklistedShows.includes(show.id)) return false;
@@ -479,6 +491,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (activeFilter === 'running') return e.show.status?.toLowerCase() === 'running';
                 
                 return true;
+            });
+        }
+
+        if (activeGenre !== 'all') {
+            filtered = filtered.filter(e => {
+                if (activeGenre === 'k-drama') {
+                    return e.show.language === 'Korean' || 
+                           e.show.network?.country?.code === 'KR' || 
+                           e.show.webChannel?.country?.code === 'KR';
+                }
+                const genres = e.show.genres || [];
+                return genres.some(g => g.toLowerCase() === activeGenre);
             });
         }
 
