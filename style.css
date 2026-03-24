@@ -328,11 +328,10 @@ nav {
     display: none; /* Hide images in monthly grid for density */
 }
 
-/* Hide Button */
-.hide-btn {
+/* action buttons */
+.hide-btn, .like-btn {
     position: absolute;
     top: 5px;
-    right: 5px;
     background: rgba(0, 0, 0, 0.4);
     border: none;
     color: var(--text-secondary);
@@ -347,11 +346,25 @@ nav {
     transition: all var(--transition);
 }
 
+.hide-btn {
+    right: 5px;
+}
+
+.like-btn {
+    right: 30px;
+}
+
+.like-btn.liked {
+    display: flex;
+    color: #ff4d94;
+}
+
 .show-card {
     position: relative; /* For hide button positioning */
 }
 
-.show-card:hover .hide-btn {
+.show-card:hover .hide-btn,
+.show-card:hover .like-btn {
     display: flex;
 }
 
@@ -454,6 +467,16 @@ nav {
 
 .show-card.popular {
     border-left: 3px solid var(--accent);
+}
+
+.show-card.liked-show {
+    border-color: #ff4d94;
+    box-shadow: 0 0 10px rgba(255, 77, 148, 0.2);
+}
+
+.like-btn:hover {
+    background: #ff4d94;
+    color: white;
 }
 
 .show-card.season-premiere {

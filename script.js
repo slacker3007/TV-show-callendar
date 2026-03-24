@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const POPULAR_THRESHOLD = 50; // Lowered to include more "2026 hits"
     
     let blacklistedShows = JSON.parse(localStorage.getItem('tvpulse_blacklist') || '[]');
+    let likedShows = JSON.parse(localStorage.getItem('tvpulse_liked') || '[]');
 
     // Elements
     const calendarGrid = document.getElementById('calendar-grid');
@@ -57,8 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.classList.add('active');
                 activeFilter = btn.dataset.filter;
                 
-                // Toggle hidden controls visibility
-                if (activeFilter === 'hidden') {
+                // Toggle controls visibility based on filter
+                if (activeFilter === 'hidden' || activeFilter === 'liked') {
                     hiddenControls.style.display = 'flex';
                     prevBtn.style.display = 'none';
                     nextBtn.style.display = 'none';
@@ -228,16 +229,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         exportBtn.onclick = () => {
-            if (blacklistedShows.length === 0) return alert('Nothing to export!');
+            const exportData = {
+                hidden: blacklistedShows,
+                liked: likedShows
+            };
             
-            // For export, we try to gather some info if possible, but IDs are the core.
-            // Let's just export the IDs for now as that's what we store.
-            const dataStr = JSON.stringify(blacklistedShows, null, 2);
+            if (exportData.hidden.length === 0 && exportData.liked.length === 0) {
+                return alert('Nothing to export!');
+            }
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `tvpulse_blacklist_${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `tvpulse_settings_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
             URL.revokeObjectURL(url);
         };
@@ -251,19 +257,36 @@ document.addEventListener('DOMContentLoaded', () => {
             reader.onload = (event) => {
                 try {
                     const imported = JSON.parse(event.target.result);
+                    
                     if (Array.isArray(imported)) {
-                        if (confirm(`Import ${imported.length} shows? This will MERGE with your current list.`)) {
-                            // Merge and unique
+                        if (confirm(`Import ${imported.length} hidden shows? This will MERGE with your current list.`)) {
                             blacklistedShows = [...new Set([...blacklistedShows, ...imported])];
                             localStorage.setItem('tvpulse_blacklist', JSON.stringify(blacklistedShows));
                             renderCalendar();
                         }
+                    } else if (imported && (Array.isArray(imported.hidden) || Array.isArray(imported.liked))) {
+                        let msg = 'Import settings? This will MERGE with your current lists.\\n';
+                        if (imported.hidden) msg += `- ${imported.hidden.length} hidden shows\\n`;
+                        if (imported.liked) msg += `- ${imported.liked.length} liked shows\\n`;
+                        
+                        if (confirm(msg)) {
+                            if (imported.hidden) {
+                                blacklistedShows = [...new Set([...blacklistedShows, ...imported.hidden])];
+                                localStorage.setItem('tvpulse_blacklist', JSON.stringify(blacklistedShows));
+                            }
+                            if (imported.liked) {
+                                likedShows = [...new Set([...likedShows, ...imported.liked])];
+                                localStorage.setItem('tvpulse_liked', JSON.stringify(likedShows));
+                            }
+                            renderCalendar();
+                        }
                     } else {
-                        alert('Invalid file format. Please upload a JSON array of show IDs.');
+                        alert('Invalid file format. Please upload a valid settings JSON.');
                     }
                 } catch (err) {
                     alert('Error parsing file.');
                 }
+                importInput.value = '';
             };
             reader.readAsText(file);
         };
@@ -274,6 +297,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function renderCalendar() {
         if (activeFilter === 'hidden') {
             return renderHiddenShows();
+        }
+        if (activeFilter === 'liked') {
+            return renderLikedShows();
         }
 
         calendarGrid.innerHTML = '<div class="loading">Syncing schedule...</div>';
@@ -322,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const showsDetails = [];
         const CHUNK_SIZE = 5;
         for (let i = 0; i < blacklistedShows.length; i += CHUNK_SIZE) {
+            if (activeFilter !== 'hidden') return; // Stop if user switched tabs
             const chunk = blacklistedShows.slice(i, i + CHUNK_SIZE);
             const results = await Promise.all(
                 chunk.map(id => fetch(`https://api.tvmaze.com/shows/${id}`).then(r => r.ok ? r.json() : null))
@@ -330,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (i + CHUNK_SIZE < blacklistedShows.length) await delay(300);
         }
 
+        if (activeFilter !== 'hidden') return; // Final check before rendering DOM
         calendarGrid.innerHTML = '';
         
         if (showsDetails.length === 0) {
@@ -344,11 +372,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const platformName = show.webChannel?.name || show.network?.name || '';
             const platformClass = getPlatformClass(platformName);
             const platformLabel = platformName ? `<span class="platform-label ${platformClass}">${platformName}</span>` : '';
-            const rating = show.rating?.average ? `<div class="rating"><i class="ri-star-fill"></i> ${show.rating.average}</div>` : '';
+            const rating = show.rating?.average ? `<div class="rating">Score: ${show.rating.average}</div>` : '';
 
             card.innerHTML = `
-                <div class="image-container"><img src="${show.image?.medium || ''}" alt=""></div>
-                <button class="unhide-btn" title="Undo hide"><i class="ri-refresh-line"></i></button>
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 0.25rem;">
+                    <button class="unhide-btn" style="position: static; width: auto; height: auto; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem;" title="Undo hide">Unhide</button>
+                </div>
                 <div class="card-content">
                     <div class="card-top-info">
                         ${platformLabel}
@@ -364,7 +393,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 ev.stopPropagation();
                 blacklistedShows = blacklistedShows.filter(id => id !== show.id);
                 localStorage.setItem('tvpulse_blacklist', JSON.stringify(blacklistedShows));
-                renderHiddenShows();
+                card.remove();
+                if (document.querySelectorAll('.show-card.hidden-item').length === 0) {
+                    calendarGrid.innerHTML = '<div class="no-episodes" style="grid-column: 1/-1;">You haven\'t hidden any shows yet. Use the close icon on any show card to hide it forever.</div>';
+                }
+            };
+            
+            card.onclick = () => window.open(show.url, '_blank');
+            calendarGrid.appendChild(card);
+        });
+    }
+
+    async function renderLikedShows() {
+        calendarGrid.innerHTML = '<div class="loading">Loading liked series...</div>';
+        calendarGrid.classList.add('hidden-view-grid');
+        rangeDisplay.textContent = 'Liked Series';
+
+        if (likedShows.length === 0) {
+            calendarGrid.innerHTML = '<div class="no-episodes" style="grid-column: 1/-1;">You haven\'t liked any shows yet. Use the heart icon on any show card to like it.</div>';
+            return;
+        }
+
+        const showsDetails = [];
+        const CHUNK_SIZE = 5;
+        for (let i = 0; i < likedShows.length; i += CHUNK_SIZE) {
+            if (activeFilter !== 'liked') return;
+            const chunk = likedShows.slice(i, i + CHUNK_SIZE);
+            const results = await Promise.all(
+                chunk.map(id => fetch(`https://api.tvmaze.com/shows/${id}`).then(r => r.ok ? r.json() : null))
+            );
+            showsDetails.push(...results.filter(s => s !== null));
+            if (i + CHUNK_SIZE < likedShows.length) await delay(300);
+        }
+
+        if (activeFilter !== 'liked') return;
+        calendarGrid.innerHTML = '';
+        
+        if (showsDetails.length === 0) {
+            calendarGrid.innerHTML = '<div class="no-episodes" style="grid-column: 1/-1;">Could not fetch show details.</div>';
+            return;
+        }
+
+        showsDetails.forEach(show => {
+            const card = document.createElement('div');
+            card.className = 'show-card hidden-item liked-show';
+            
+            const platformName = show.webChannel?.name || show.network?.name || '';
+            const platformClass = getPlatformClass(platformName);
+            const platformLabel = platformName ? `<span class="platform-label ${platformClass}">${platformName}</span>` : '';
+            const rating = show.rating?.average ? `<div class="rating">Score: ${show.rating.average}</div>` : '';
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 0.25rem;">
+                    <button class="unlike-btn" style="position: static; width: auto; height: auto; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; background: #ff4d94; color: white; border: none; cursor: pointer;" title="Unlike">Unlike</button>
+                </div>
+                <div class="card-content">
+                    <div class="card-top-info">
+                        ${platformLabel}
+                        ${rating}
+                    </div>
+                    <h4>${show.name}</h4>
+                    <p class="episode-info">${show.genres ? show.genres.join(', ') : ''}</p>
+                    <div class="time">${show.status}</div>
+                </div>
+            `;
+            
+            card.querySelector('.unlike-btn').onclick = (ev) => {
+                ev.stopPropagation();
+                likedShows = likedShows.filter(id => id !== show.id);
+                localStorage.setItem('tvpulse_liked', JSON.stringify(likedShows));
+                card.remove();
+                if (document.querySelectorAll('.show-card.liked-show').length === 0) {
+                    calendarGrid.innerHTML = '<div class="no-episodes" style="grid-column: 1/-1;">You haven\'t liked any shows yet. Use the heart icon on any show card to like it.</div>';
+                }
             };
             
             card.onclick = () => window.open(show.url, '_blank');
@@ -436,6 +537,12 @@ document.addEventListener('DOMContentLoaded', () => {
             eps = eps.filter(e => seen.has(e.id) ? false : seen.add(e.id));
             
             eps.sort((a, b) => {
+                const aLiked = likedShows.includes(a.show?.id);
+                const bLiked = likedShows.includes(b.show?.id);
+                
+                if (aLiked && !bLiked) return -1;
+                if (!aLiked && bLiked) return 1;
+
                 const aIsPremiere = a.number === 1;
                 const bIsPremiere = b.number === 1;
                 
@@ -496,6 +603,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (activeGenre !== 'all') {
             filtered = filtered.filter(e => {
+                if (activeGenre === 'liked') {
+                    return likedShows.includes(e.show.id);
+                }
                 if (activeGenre === 'k-drama') {
                     return e.show.language === 'Korean' || 
                            e.show.network?.country?.code === 'KR' || 
@@ -540,8 +650,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 epText += ` <span style="background: var(--accent); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.70rem; margin-left: 4px; vertical-align: middle;">+${group.length - 1} Eps</span>`;
             }
 
+            if (likedShows.includes(e.show.id)) card.classList.add('liked-show');
+
             card.innerHTML = `
                 ${img}
+                <button class="like-btn ${likedShows.includes(e.show.id) ? 'liked' : ''}" title="${likedShows.includes(e.show.id) ? 'Unlike' : 'Like'}">
+                    <i class="${likedShows.includes(e.show.id) ? 'ri-heart-fill' : 'ri-heart-line'}"></i>
+                </button>
                 <button class="hide-btn" title="Hide forever"><i class="ri-close-line"></i></button>
                 <div class="card-content">
                     <div class="card-top-info">
@@ -553,12 +668,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="time">${e.airtime || 'Stream'}</div>
                 </div>
             `;
+            card.querySelector('.like-btn').onclick = (ev) => {
+                ev.stopPropagation();
+                const icon = ev.currentTarget.querySelector('i');
+                if (likedShows.includes(e.show.id)) {
+                    likedShows = likedShows.filter(id => id !== e.show.id);
+                    card.classList.remove('liked-show');
+                    ev.currentTarget.classList.remove('liked');
+                    ev.currentTarget.title = 'Like';
+                    icon.classList.remove('ri-heart-fill');
+                    icon.classList.add('ri-heart-line');
+                } else {
+                    likedShows.push(e.show.id);
+                    card.classList.add('liked-show');
+                    ev.currentTarget.classList.add('liked');
+                    ev.currentTarget.title = 'Unlike';
+                    icon.classList.remove('ri-heart-line');
+                    icon.classList.add('ri-heart-fill');
+                }
+                localStorage.setItem('tvpulse_liked', JSON.stringify(likedShows));
+                
+                // Cache name for faster loading
+                const cache = JSON.parse(localStorage.getItem('tvpulse_names') || '{}');
+                cache[e.show.id] = e.show.name;
+                localStorage.setItem('tvpulse_names', JSON.stringify(cache));
+            };
+
             card.querySelector('.hide-btn').onclick = (ev) => {
                 ev.stopPropagation();
                 if (!blacklistedShows.includes(e.show.id)) {
                     blacklistedShows.push(e.show.id);
                     localStorage.setItem('tvpulse_blacklist', JSON.stringify(blacklistedShows));
-                    renderCalendar();
+                    
+                    // Cache name for faster loading
+                    const cache = JSON.parse(localStorage.getItem('tvpulse_names') || '{}');
+                    cache[e.show.id] = e.show.name;
+                    localStorage.setItem('tvpulse_names', JSON.stringify(cache));
+                    
+                    card.remove();
                 }
             };
             card.onclick = () => window.open(e.show.url, '_blank');

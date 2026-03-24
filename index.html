@@ -41,12 +41,13 @@
                     <button class="filter-btn active" data-filter="all">Latest</button>
                     <button class="filter-btn" data-filter="popular">Trending</button>
                     <button class="filter-btn" data-filter="rated">Top Rated</button>
+                    <button class="filter-btn" data-filter="liked">Liked</button>
                     <button class="filter-btn" data-filter="hidden">Hidden</button>
                 </div>
                 
                 <div id="hidden-controls" class="hidden-controls" style="display: none;">
-                    <button id="export-blacklist" class="btn-icon" title="Export Hidden List"><i class="ri-download-2-line"></i></button>
-                    <button id="import-blacklist" class="btn-icon" title="Import Hidden List"><i class="ri-upload-2-line"></i></button>
+                    <button id="export-blacklist" class="btn-icon" title="Export Settings"><i class="ri-download-2-line"></i></button>
+                    <button id="import-blacklist" class="btn-icon" title="Import Settings"><i class="ri-upload-2-line"></i></button>
                     <input type="file" id="import-file" style="display: none;" accept=".json">
                 </div>
                 
@@ -63,6 +64,7 @@
         <!-- Genre Tabs -->
         <div class="genre-tabs-container" id="genre-tabs">
             <button class="genre-tab active" data-genre="all">All Genres</button>
+            <button class="genre-tab" data-genre="liked"><i class="ri-heart-fill" style="margin-right:4px;"></i>Liked</button>
             <button class="genre-tab" data-genre="action">Action</button>
             <button class="genre-tab" data-genre="adventure">Adventure</button>
             <button class="genre-tab" data-genre="anime">Anime</button>
