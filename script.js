@@ -211,6 +211,17 @@ document.addEventListener('DOMContentLoaded', () => {
             };
         });
 
+        window.addEventListener('resize', () => {
+            if (window.innerWidth <= 800 && activeView === 'monthly') {
+                const weeklyBtn = document.querySelector('.view-btn[data-view="weekly"]');
+                if (weeklyBtn) weeklyBtn.click();
+            }
+        });
+        if (window.innerWidth <= 800 && activeView === 'monthly') {
+            const weeklyBtn = document.querySelector('.view-btn[data-view="weekly"]');
+            if (weeklyBtn) weeklyBtn.click();
+        }
+
         genreTabs.forEach(tab => {
             tab.onclick = () => {
                 genreTabs.forEach(t => t.classList.remove('active'));

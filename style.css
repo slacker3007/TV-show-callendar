@@ -682,6 +682,20 @@ footer {
         flex-direction: column;
         gap: 1rem;
     }
+    .view-btn[data-view="monthly"] {
+        display: none;
+    }
+    .view-btn[data-view="weekly"] {
+        width: 100%;
+        text-align: center;
+        background: var(--accent);
+        color: white;
+        box-shadow: 0 0 10px var(--accent-glow);
+    }
+    .view-toggle {
+        width: 100%;
+        max-width: 200px;
+    }
 }
 
 @media (max-width: 480px) {
